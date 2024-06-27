@@ -1,0 +1,118 @@
+networks:
+  chat_network:
+    driver: bridge
+
+services:
+  cassandra:
+    image: cassandra:latest
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: "ChatCluster"
+      CASSANDRA_DC: "dc1"
+      CASSANDRA_RACK: "rack1"
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -e 'describe keyspaces'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - chat_network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - chat_network
+
+  migrate:
+    image: cassandra:latest
+    container_name: cassandra_migrate
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ../scripts/setup_cassandra.cql:/scripts/setup_cassandra.cql
+      - ../scripts/wait-for-it.sh:/scripts/wait-for-it.sh
+    entrypoint: ["./scripts/wait-for-it.sh", "cassandra:9042", "--", "cqlsh", "-f", "/scripts/setup_cassandra.cql", "cassandra"]
+    networks:
+      - chat_network
+
+  app:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: chat_app
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../cmd:/chat-system/cmd
+      - ../docs:/chat-system/docs
+      - ../internal:/chat-system/internal
+      - ../scripts:/chat-system/scripts
+      - ../go.mod:/chat-system/go.mod
+      - ../go.sum:/chat-system/go.sum
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - ../.env
+    networks:
+      - chat_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - chat_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - loki
+    networks:
+      - chat_network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/local-config.yaml:/etc/loki/local-config.yaml
+      - ./loki/data:/loki
+    networks:
+      - chat_network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "5050:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - app
+    networks:
+      - chat_network

@@ -1,0 +1,199 @@
+basePath: /
+definitions:
+  auth.AuthRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  message.MessageRequest:
+    properties:
+      content:
+        type: string
+      recipient:
+        type: string
+      sender:
+        type: string
+    type: object
+  models.Message:
+    properties:
+      content:
+        type: string
+      id:
+        type: string
+      recipient:
+        type: string
+      sender:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a chat microservice.
+  title: Chat Microservice API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login a user with a username and password
+      parameters:
+      - description: User credentials
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login a user
+      tags:
+      - auth
+  /messages:
+    get:
+      description: Get the message history for a user
+      parameters:
+      - description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Username
+        in: query
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Message'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get message history
+      tags:
+      - message
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with a username and password
+      parameters:
+      - description: User credentials
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+  /send:
+    post:
+      consumes:
+      - application/json
+      description: Send a message from one user to another
+      parameters:
+      - description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Message content
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/message.MessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Message'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Send a message
+      tags:
+      - message
+swagger: "2.0"
